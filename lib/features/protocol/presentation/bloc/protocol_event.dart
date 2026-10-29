@@ -27,13 +27,25 @@ class ExtractedToggled extends ProtocolEvent {
   List<Object?> get props => [fdi];
 }
 
-/// Клик по чипу патологии: добавить находку или снять существующую.
-class PathologyToggled extends ProtocolEvent {
-  const PathologyToggled(this.pathologyId);
+/// Клик по чипу патологии: добавить/убрать из черновиков
+/// (в режиме правки — заменить патологию редактируемой находки).
+class PathologySelected extends ProtocolEvent {
+  const PathologySelected(this.pathologyId);
   final String pathologyId;
 
   @override
   List<Object?> get props => [pathologyId];
+}
+
+/// Кнопка «Добавить в протокол» / «Сохранить изменения»:
+/// зафиксировать черновики в findings и сбросить выбор.
+class DraftCommitted extends ProtocolEvent {
+  const DraftCommitted();
+}
+
+/// Кнопка «Отмена»: сбросить черновики и выбор зубов без добавления.
+class DraftDiscarded extends ProtocolEvent {
+  const DraftDiscarded();
 }
 
 /// Удаление находки из списка.
@@ -45,60 +57,80 @@ class FindingRemoved extends ProtocolEvent {
   List<Object?> get props => [uid];
 }
 
-/// Активация находки для редактирования динамических полей.
-class FindingActivated extends ProtocolEvent {
-  const FindingActivated(this.uid);
+/// Клик по чипу находки: вернуть её в редактор (черновик + зубы).
+class FindingEditRequested extends ProtocolEvent {
+  const FindingEditRequested(this.uid);
   final String uid;
 
   @override
   List<Object?> get props => [uid];
 }
 
-/// Смена количества измерений (1/2/3) у активной находки.
-class SizeCountChanged extends ProtocolEvent {
-  const SizeCountChanged(this.count);
-  final int count;
-
-  @override
-  List<Object?> get props => [count];
+/// Вернуть в выбор набор зубов последней добавленной находки.
+class TeethRestored extends ProtocolEvent {
+  const TeethRestored();
 }
 
-/// Изменение значений размеров у активной находки.
+/// Отменить последнее добавление: снять находки и вернуть их в черновики.
+class LastCommitUndone extends ProtocolEvent {
+  const LastCommitUndone();
+}
+
+/// Смена количества измерений (1/2/3) у черновика.
+class SizeCountChanged extends ProtocolEvent {
+  const SizeCountChanged(this.count, {this.pathologyId});
+  final int count;
+  final String? pathologyId;
+
+  @override
+  List<Object?> get props => [count, pathologyId];
+}
+
+/// Изменение значений размеров у черновика.
 class MeasurementsChanged extends ProtocolEvent {
-  const MeasurementsChanged({this.x, this.y, this.z});
+  const MeasurementsChanged({this.pathologyId, this.x, this.y, this.z});
+  final String? pathologyId;
   final String? x;
   final String? y;
   final String? z;
 
   @override
-  List<Object?> get props => [x, y, z];
+  List<Object?> get props => [pathologyId, x, y, z];
 }
 
-/// Выбор стороны у активной находки.
+/// Выбор стороны у черновика.
 class SideChanged extends ProtocolEvent {
-  const SideChanged(this.side);
+  const SideChanged(this.side, {this.pathologyId});
   final Side side;
+  final String? pathologyId;
 
   @override
-  List<Object?> get props => [side];
+  List<Object?> get props => [side, pathologyId];
 }
 
-/// Выбор направления у активной находки.
+/// Выбор направления у черновика.
 class DirectionChanged extends ProtocolEvent {
-  const DirectionChanged(this.direction);
+  const DirectionChanged(this.direction, {this.pathologyId});
   final Direction direction;
+  final String? pathologyId;
 
   @override
-  List<Object?> get props => [direction];
+  List<Object?> get props => [direction, pathologyId];
 }
 
-/// Выбор соседнего зуба у активной находки.
+/// Выбор соседнего зуба у черновика.
 class AdjacentChanged extends ProtocolEvent {
-  const AdjacentChanged(this.fdi);
+  const AdjacentChanged(this.fdi, {this.pathologyId});
   final int fdi;
+  final String? pathologyId;
 
   @override
-  List<Object?> get props => [fdi];
+  List<Object?> get props => [fdi, pathologyId];
+}
+
+/// Переключение фразы «ВНЧС без структурных изменений» в каркасе КЛКТ.
+class SkeletonToggled extends ProtocolEvent {
+  const SkeletonToggled();
 }
 
 /// Полная очистка протокола.

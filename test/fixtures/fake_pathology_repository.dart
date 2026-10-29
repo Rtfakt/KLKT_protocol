@@ -9,7 +9,7 @@ class FakePathologyRepository implements PathologyRepository {
     groupId: 'g_test',
     name: 'Зубная без уточнений',
     descriptionTemplate: 'зубная без уточнений',
-    conclusionText: 'зубной без уточнений',
+    conclusionTemplate: 'зубная без уточнений {teeth}',
     frequency: 5,
     scope: PathologyScope.tooth,
   );
@@ -19,10 +19,22 @@ class FakePathologyRepository implements PathologyRepository {
     groupId: 'g_test',
     name: 'Зубная с размером',
     descriptionTemplate: 'зубная с размером {size}',
-    conclusionText: 'зубной с размером',
+    conclusionTemplate: 'зубная с размером {teeth}',
     frequency: 4,
     scope: PathologyScope.tooth,
     requiresSize: true,
+  );
+
+  static const toothSizeTwo = Pathology(
+    id: 'tooth_size_two',
+    groupId: 'g_test',
+    name: 'Зубная с двумя размерами',
+    descriptionTemplate: 'зубная с двумя размерами {size}',
+    conclusionTemplate: 'зубная с двумя размерами {teeth}',
+    frequency: 4,
+    scope: PathologyScope.tooth,
+    requiresSize: true,
+    defaultSizeCount: 2,
   );
 
   static const generalSide = Pathology(
@@ -30,10 +42,21 @@ class FakePathologyRepository implements PathologyRepository {
     groupId: 'g_test',
     name: 'Общая со стороной',
     descriptionTemplate: 'общая со стороной',
-    conclusionText: 'общей со стороной',
+    conclusionTemplate: 'общая со стороной',
     frequency: 3,
     scope: PathologyScope.general,
     requiresSide: true,
+  );
+
+  static const toothAdjacent = Pathology(
+    id: 'tooth_adjacent',
+    groupId: 'g_test',
+    name: 'Зубная с соседом',
+    descriptionTemplate: 'на контакте с {adjacent}',
+    conclusionTemplate: 'на контакте с {adjacent} {teeth}',
+    frequency: 1,
+    scope: PathologyScope.tooth,
+    requiresAdjacentTooth: true,
   );
 
   static const toothExtracted = Pathology(
@@ -42,17 +65,24 @@ class FakePathologyRepository implements PathologyRepository {
     name: 'Зубная с шаблоном удаления',
     descriptionTemplate: 'зубная',
     extractedTemplate: 'зубная (шаблон удалённого)',
-    conclusionText: 'зубной',
+    conclusionTemplate: 'зубная {teeth}',
     frequency: 2,
     scope: PathologyScope.tooth,
   );
 
-  static const _all = [toothSimple, toothSize, generalSide, toothExtracted];
+  static const _all = [
+    toothSimple,
+    toothSize,
+    toothSizeTwo,
+    generalSide,
+    toothAdjacent,
+    toothExtracted,
+  ];
 
   @override
   List<PathologyGroup> get groups => const [
-        PathologyGroup(id: 'g_test', title: 'Тест', order: 1, items: _all),
-      ];
+    PathologyGroup(id: 'g_test', title: 'Тест', order: 1, items: _all),
+  ];
 
   @override
   Pathology? byId(String id) {

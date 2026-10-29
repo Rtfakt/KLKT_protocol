@@ -19,8 +19,12 @@ class DentalFormulaGrid extends StatelessWidget {
     return BlocBuilder<ProtocolBloc, ProtocolState>(
       buildWhen: (prev, curr) =>
           prev.selectedFdis != curr.selectedFdis ||
-          prev.extractedFdis != curr.extractedFdis,
+          prev.extractedFdis != curr.extractedFdis ||
+          prev.lastCommittedFdis != curr.lastCommittedFdis,
       builder: (context, state) {
+        final bloc = context.read<ProtocolBloc>();
+        final canRestore =
+            state.selectedFdis.isEmpty && state.lastCommittedFdis.isNotEmpty;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -36,12 +40,35 @@ class DentalFormulaGrid extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Клик — выбрать зуб (мультивыбор). '
-                    'ПКМ или долгое нажатие — пометить как удалённый.',
+                    'ПКМ или долгое нажатие — пометить как удалённый. '
+                    'Выбор сбрасывается после добавления находки.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.outline,
                         ),
                   ),
                 ),
+                if (canRestore)
+                  TextButton.icon(
+                    onPressed: () => bloc.add(const TeethRestored()),
+                    icon: const Icon(Icons.undo, size: 16),
+                    label: Text(
+                      'Вернуть ${formatFdis(sortFdis(state.lastCommittedFdis))}',
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
+                  ),
+                if (state.selectedFdis.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () {
+                      for (final fdi in {...state.selectedFdis}) {
+                        bloc.add(ToothSelectionToggled(fdi));
+                      }
+                    },
+                    icon: const Icon(Icons.deselect, size: 16),
+                    label: const Text(
+                      'Снять выбор',
+                      style: TextStyle(fontSize: 12.5),
+                    ),
+                  ),
               ],
             ),
           ],
@@ -102,7 +129,9 @@ class _ToothCell extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1.5),
       child: Tooltip(
-        message: isExtracted ? 'Зуб $fdi (удален)' : 'Зуб $fdi',
+        message: isExtracted
+            ? 'Зуб ${formatFdi(fdi)} (удален)'
+            : 'Зуб ${formatFdi(fdi)}',
         waitDuration: const Duration(milliseconds: 600),
         child: GestureDetector(
           onSecondaryTap: () => bloc.add(ExtractedToggled(fdi)),
@@ -129,7 +158,7 @@ class _ToothCell extends StatelessWidget {
                 alignment: Alignment.center,
                 children: [
                   Text(
-                    '$fdi',
+                    formatFdi(fdi),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight:

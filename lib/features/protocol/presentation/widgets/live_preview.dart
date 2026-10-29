@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/fdi.dart';
 import '../../domain/entities/selected_pathology.dart';
+import '../../domain/entities/study_type.dart';
 import '../../domain/repositories/pathology_repository.dart';
-import '../../domain/services/report_generator.dart';
+import '../../domain/services/finding_validator.dart';
+import '../../domain/services/report_text.dart';
 import '../bloc/protocol_bloc.dart';
 import '../bloc/protocol_event.dart';
 import '../bloc/protocol_state.dart';
@@ -15,14 +18,25 @@ class LivePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final generator = context.read<ReportGenerator>();
+    final generator = context.read<ProtocolReportGenerator>();
+    final validator = context.read<FindingValidator>();
+    // Каркас КЛКТ включён всегда. Переключатель добавляет фразу ВНЧС.
+    // У ОПГ каркас полный и свой — переключатель не показывается.
+    final isOpg = context.read<ProtocolBloc>().studyType == StudyType.opg;
     return BlocBuilder<ProtocolBloc, ProtocolState>(
       buildWhen: (prev, curr) =>
           prev.findings != curr.findings ||
           prev.extractedFdis != curr.extractedFdis ||
-          prev.activeFindingUid != curr.activeFindingUid,
+          prev.editingUid != curr.editingUid ||
+          prev.includeTmjNorm != curr.includeTmjNorm,
       builder: (context, state) {
         final report = generator.generate(
+          findings: state.findings,
+          extractedFdis: state.extractedFdis,
+          includeSkeleton: true,
+          includeTmjNorm: state.includeTmjNorm,
+        );
+        final issues = validator.validate(
           findings: state.findings,
           extractedFdis: state.extractedFdis,
         );
@@ -40,6 +54,7 @@ class LivePreview extends StatelessWidget {
                       text: report.description,
                       placeholder:
                           'Выберите зубы и патологии — текст появится здесь.',
+                      trailing: isOpg ? null : _SkeletonToggle(state: state),
                     ),
                     const SizedBox(height: 10),
                     _ReportCard(
@@ -47,6 +62,10 @@ class LivePreview extends StatelessWidget {
                       text: report.conclusion,
                       placeholder: 'Заключение формируется автоматически.',
                     ),
+                    if (issues.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _IssuesCard(issues: issues),
+                    ],
                     const SizedBox(height: 10),
                     _FindingsList(state: state),
                   ],
@@ -62,12 +81,13 @@ class LivePreview extends StatelessWidget {
                         ? null
                         : () async {
                             await Clipboard.setData(
-                                ClipboardData(text: report.asPlainText()));
+                              ClipboardData(text: report.asPlainText()),
+                            );
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content:
-                                        Text('Протокол скопирован в буфер')),
+                                  content: Text('Протокол скопирован в буфер'),
+                                ),
                               );
                             }
                           },
@@ -80,7 +100,8 @@ class LivePreview extends StatelessWidget {
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text('Экспорт в PDF/DOCX — в разработке')),
+                        content: Text('Экспорт в PDF/DOCX — в разработке'),
+                      ),
                     );
                   },
                   icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
@@ -100,11 +121,13 @@ class _ReportCard extends StatelessWidget {
     required this.title,
     required this.text,
     required this.placeholder,
+    this.trailing,
   });
 
   final String title;
   final String text;
   final String placeholder;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -117,23 +140,130 @@ class _ReportCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    letterSpacing: 1.1,
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w700,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      letterSpacing: 1.1,
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
+                ),
+                if (trailing != null) trailing!,
+              ],
             ),
             const SizedBox(height: 8),
             SelectableText(
               isEmpty ? placeholder : text,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    height: 1.55,
-                    fontStyle: isEmpty ? FontStyle.italic : FontStyle.normal,
-                    color: isEmpty ? scheme.outline : scheme.onSurface,
-                  ),
+                height: 1.55,
+                fontStyle: isEmpty ? FontStyle.italic : FontStyle.normal,
+                color: isEmpty ? scheme.outline : scheme.onSurface,
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Переключатель фразы «ВНЧС без структурных изменений» в каркасе КЛКТ.
+class _SkeletonToggle extends StatelessWidget {
+  const _SkeletonToggle({required this.state});
+
+  final ProtocolState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final bloc = context.read<ProtocolBloc>();
+    return Tooltip(
+      message:
+          'Добавить в каркас фразу «ВНЧС без структурных изменений». '
+          'Не добавляется, если в протоколе уже есть изменения ВНЧС',
+      waitDuration: const Duration(milliseconds: 700),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('ВНЧС', style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(width: 4),
+          SizedBox(
+            height: 24,
+            child: FittedBox(
+              child: Switch(
+                value: state.includeTmjNorm,
+                onChanged: (_) => bloc.add(const SkeletonToggled()),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Карточка предупреждений валидатора: клик по строке возвращает
+/// связанную находку в редактор.
+class _IssuesCard extends StatelessWidget {
+  const _IssuesCard({required this.issues});
+
+  final List<ValidationIssue> issues;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bloc = context.read<ProtocolBloc>();
+    return Card(
+      margin: EdgeInsets.zero,
+      color: scheme.errorContainer.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ПРОТИВОРЕЧИЯ (${issues.length})',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                letterSpacing: 1.1,
+                color: scheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (final issue in issues)
+              InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: issue.relatedUids.isEmpty
+                    ? null
+                    : () => bloc.add(
+                        FindingEditRequested(issue.relatedUids.first),
+                      ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        issue.severity == IssueSeverity.error
+                            ? Icons.error_outline
+                            : Icons.warning_amber_rounded,
+                        size: 16,
+                        color: scheme.error,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          issue.message,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -166,10 +296,10 @@ class _FindingsList extends StatelessWidget {
                   child: Text(
                     'НАХОДКИ (${state.findings.length})',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          letterSpacing: 1.1,
-                          color: scheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      letterSpacing: 1.1,
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 TextButton.icon(
@@ -187,7 +317,7 @@ class _FindingsList extends StatelessWidget {
                 for (final finding in state.findings)
                   _FindingChip(
                     finding: finding,
-                    isActive: finding.uid == state.activeFindingUid,
+                    isActive: finding.uid == state.editingUid,
                   ),
               ],
             ),
@@ -208,18 +338,20 @@ class _FindingChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final bloc = context.read<ProtocolBloc>();
-    final pathology =
-        context.read<PathologyRepository>().byId(finding.pathologyId);
+    final pathology = context.read<PathologyRepository>().byId(
+      finding.pathologyId,
+    );
     if (pathology == null) return const SizedBox.shrink();
 
     final incomplete = !finding.isCompleteFor(pathology);
-    final teeth =
-        finding.toothFdis.isEmpty ? '' : '${finding.toothFdis.join(", ")}: ';
+    final teeth = finding.toothFdis.isEmpty
+        ? ''
+        : '${formatFdis(finding.toothFdis)}: ';
 
     return Tooltip(
       message: incomplete
           ? 'Не заполнены обязательные поля — нажмите, чтобы дозаполнить'
-          : 'Нажмите, чтобы редактировать уточнения',
+          : 'Нажмите, чтобы вернуть находку в редактор',
       waitDuration: const Duration(milliseconds: 700),
       child: InputChip(
         label: Text(
@@ -232,7 +364,7 @@ class _FindingChip extends StatelessWidget {
             : null,
         selected: isActive,
         side: incomplete ? BorderSide(color: scheme.error) : null,
-        onPressed: () => bloc.add(FindingActivated(finding.uid)),
+        onPressed: () => bloc.add(FindingEditRequested(finding.uid)),
         onDeleted: () => bloc.add(FindingRemoved(finding.uid)),
       ),
     );

@@ -12,17 +12,17 @@ class Measurements extends Equatable {
   final String z;
 
   bool get isComplete => switch (count) {
-        1 => x.trim().isNotEmpty,
-        2 => x.trim().isNotEmpty && y.trim().isNotEmpty,
-        _ => x.trim().isNotEmpty && y.trim().isNotEmpty && z.trim().isNotEmpty,
-      };
+    1 => x.trim().isNotEmpty,
+    2 => x.trim().isNotEmpty && y.trim().isNotEmpty,
+    _ => x.trim().isNotEmpty && y.trim().isNotEmpty && z.trim().isNotEmpty,
+  };
 
   /// «до X мм» / «X х Y мм» / «X х Y х Z мм».
   String render() => switch (count) {
-        1 => 'до ${x.trim()} мм',
-        2 => '${x.trim()} х ${y.trim()} мм',
-        _ => '${x.trim()} х ${y.trim()} х ${z.trim()} мм',
-      };
+    1 => 'до ${x.trim()} мм',
+    2 => '${x.trim()} х ${y.trim()} мм',
+    _ => '${x.trim()} х ${y.trim()} х ${z.trim()} мм',
+  };
 
   Measurements copyWith({int? count, String? x, String? y, String? z}) =>
       Measurements(
@@ -76,18 +76,25 @@ class SelectedPathology extends Equatable {
     Side? side,
     Direction? direction,
     int? adjacentFdi,
-  }) =>
-      SelectedPathology(
-        uid: uid,
-        pathologyId: pathologyId,
-        toothFdis: toothFdis ?? this.toothFdis,
-        measurements: measurements ?? this.measurements,
-        side: side ?? this.side,
-        direction: direction ?? this.direction,
-        adjacentFdi: adjacentFdi ?? this.adjacentFdi,
-      );
+    bool clearAdjacentFdi = false,
+  }) => SelectedPathology(
+    uid: uid,
+    pathologyId: pathologyId,
+    toothFdis: toothFdis ?? this.toothFdis,
+    measurements: measurements ?? this.measurements,
+    side: side ?? this.side,
+    direction: direction ?? this.direction,
+    adjacentFdi: clearAdjacentFdi ? null : (adjacentFdi ?? this.adjacentFdi),
+  );
 
   @override
-  List<Object?> get props =>
-      [uid, pathologyId, toothFdis, measurements, side, direction, adjacentFdi];
+  List<Object?> get props => [
+    uid,
+    pathologyId,
+    toothFdis,
+    measurements,
+    side,
+    direction,
+    adjacentFdi,
+  ];
 }

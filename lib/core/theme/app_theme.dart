@@ -5,6 +5,12 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
+  /// Отступ плавающего уведомления от краёв окна.
+  ///
+  /// Снизу 64 dp — чтобы полоса не закрывала ряд «Копировать в буфер» /
+  /// «PDF/DOCX»: отступ рабочей области 12, высота кнопки 40, зазор 12.
+  static const EdgeInsets snackBarMargin = EdgeInsets.fromLTRB(16, 8, 16, 64);
+
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF00696D));
     return ThemeData(
@@ -28,7 +34,10 @@ class AppTheme {
         collapsedShape: const Border(),
         iconColor: scheme.primary,
       ),
-      snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        insetPadding: snackBarMargin,
+      ),
     );
   }
 }
